@@ -349,6 +349,7 @@
 
     html += '<div class="section-title"><h2>Inventário</h2>'+
       '<div class="row">'+
+      '<button type="button" class="btn small" id="btnRefreshItems" title="Atualizar lista">🔄 Atualizar</button>'+
       '<button type="button" class="btn small" id="btnEditEvent">Editar evento</button>'+
       '<button type="button" class="btn small" id="btnExportCsv">Exportar CSV</button>'+
       '<button type="button" class="btn small" id="btnImportCsv">Importar CSV</button>'+
@@ -367,6 +368,12 @@
     main.innerHTML = html;
 
     $("btnAddItem").addEventListener("click", function(){ openItemDialog(null); });
+    $("btnRefreshItems").addEventListener("click", function(){
+      var btn = $("btnRefreshItems");
+      btn.disabled = true;
+      btn.textContent = "A atualizar…";
+      loadItems(state.currentEventId);
+    });
     $("btnEditEvent").addEventListener("click", function(){ requireAdmin(function(){ openEventDialog(ev.id); }); });
     $("btnExportCsv").addEventListener("click", function(){ exportEventCSV(ev); });
     $("btnImportCsv").addEventListener("click", function(){ requireAdmin(function(){ $("fileImportCsv").click(); }); });
