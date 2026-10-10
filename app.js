@@ -58,6 +58,15 @@
   ];
   // ============================================================
 
+  // The splash screen's category picker. "inventory" is the only wired-up
+  // module today; add a new entry here (and a matching branch in render())
+  // to ship another category — disabled entries render as "Em breve"
+  // placeholders so the picker already shows it's built for more than one.
+  var CATEGORIES = [
+    { key:"inventory", label:"Inventário de Festas", description:"Doações e compras para cada festa do ano.", icon:"🎈", enabled:true },
+    { key:"soon", label:"Em breve", description:"Novas categorias de gestão vão aparecer aqui.", icon:"✨", enabled:false }
+  ];
+
   var $ = function(id){ return document.getElementById(id); };
 
   var CONFIGURED = SUPABASE_URL.indexOf("YOUR-PROJECT") === -1 && SUPABASE_ANON_KEY.indexOf("YOUR-ANON-PUBLIC-KEY") === -1;
@@ -68,6 +77,7 @@
     events: [],
     items: [],
     settings: { tipoOptions: ["Alimentação","Bebidas","Decoração","Brinquedos","Material Escolar","Outro"] },
+    currentCategory: null,
     currentEventId: null,
     adminUnlocked: false,
     pendingAfterUnlock: null
@@ -158,6 +168,16 @@
   }
 
   // ---------- navigation ----------
+  function openCategory(key){
+    state.currentCategory = key;
+    render();
+  }
+  function goCategories(){
+    state.currentCategory = null;
+    state.currentEventId = null;
+    if(itemsChannel){ sb.removeChannel(itemsChannel); itemsChannel = null; }
+    render();
+  }
   function openEvent(id){
     state.currentEventId = id;
     watchItems(id);
@@ -168,12 +188,27 @@
     if(itemsChannel){ sb.removeChannel(itemsChannel); itemsChannel = null; }
     render();
   }
-  $("btnBack").addEventListener("click", goHome);
+  function handleBack(){
+    if(state.currentEventId){ goHome(); }
+    else{ goCategories(); }
+  }
+  $("btnBack").addEventListener("click", handleBack);
 
   // ---------- rendering ----------
   function render(){
     var main = $("main");
-    $("btnBack").hidden = !state.currentEventId;
+    $("btnBack").hidden = !state.currentCategory;
+
+    if(!state.currentCategory){
+      renderSplash(main);
+      $("pageTitle").textContent = "Associação de Pais";
+      $("pageSubtitle").textContent = "Ferramentas de gestão da associação";
+      return;
+    }
+
+    // From here on a category is open — "inventory" is the only wired-up
+    // one, so these states/branches are all scoped to it.
+    var category = CATEGORIES.filter(function(c){ return c.key === state.currentCategory; })[0];
 
     if(state.status === "unconfigured"){
       main.innerHTML =
@@ -182,13 +217,13 @@
         'Abra <code>app.js</code>, siga os passos no topo do ficheiro para criar um projeto Supabase gratuito, e preencha '+
         '<code>SUPABASE_URL</code> e <code>SUPABASE_ANON_KEY</code> com os valores do seu projeto.'+
         '</div>';
-      $("pageTitle").textContent = "Inventário de Festas";
+      $("pageTitle").textContent = category ? category.label : "Inventário de Festas";
       $("pageSubtitle").textContent = "Associação de Pais";
       return;
     }
     if(state.status === "loading"){
       main.innerHTML = '<div class="empty"><span class="emoji">⏳</span>A carregar o inventário…</div>';
-      $("pageTitle").textContent = "Inventário de Festas";
+      $("pageTitle").textContent = category ? category.label : "Inventário de Festas";
       $("pageSubtitle").textContent = "Associação de Pais";
       return;
     }
@@ -209,8 +244,34 @@
     renderAdminPanel();
   }
 
+  // The category splash screen — always reachable regardless of Supabase
+  // connectivity, since picking a category needs no data of its own.
+  function renderSplash(main){
+    var html = '<div class="splash">'+
+      '<div class="splash-hero">'+
+        '<img class="splash-logo" src="img/AP-ji-agro.png" alt="APEJI AGRO — Associação de Pais do Jardim de Infância do Agro">'+
+        '<h2>O que quer gerir?</h2>'+
+        '<p>Escolha uma categoria para continuar.</p>'+
+      '</div><div class="grid-categories">';
+    CATEGORIES.forEach(function(c){
+      html += '<button type="button" class="card-category'+(c.enabled?'':' disabled')+'"'+
+        (c.enabled ? (' data-open-category="'+esc(c.key)+'"') : ' disabled')+'>'+
+        (!c.enabled ? '<span class="badge soon">Em breve</span>' : '')+
+        '<span class="card-category-icon">'+c.icon+'</span>'+
+        '<h3>'+esc(c.label)+'</h3>'+
+        '<p>'+esc(c.description)+'</p>'+
+        '</button>';
+    });
+    html += '</div></div>';
+    main.innerHTML = html;
+    main.querySelectorAll("[data-open-category]").forEach(function(btn){
+      btn.addEventListener("click", function(){ openCategory(btn.getAttribute("data-open-category")); });
+    });
+  }
+
   function renderHome(main){
-    $("pageTitle").textContent = "Inventário de Festas";
+    var category = CATEGORIES.filter(function(c){ return c.key === state.currentCategory; })[0];
+    $("pageTitle").textContent = category ? category.label : "Inventário de Festas";
     $("pageSubtitle").textContent = "Associação de Pais · " + state.events.length + " evento(s)";
 
     var html = '<div class="section-title"><h2>Eventos</h2>'+
@@ -289,6 +350,8 @@
     html += '<div class="section-title"><h2>Inventário</h2>'+
       '<div class="row">'+
       '<button type="button" class="btn small" id="btnEditEvent">Editar evento</button>'+
+      '<button type="button" class="btn small" id="btnExportCsv">Exportar CSV</button>'+
+      '<button type="button" class="btn small" id="btnImportCsv">Importar CSV</button>'+
       '<button type="button" class="btn danger small" id="btnDeleteEvent">Remover evento</button>'+
       '<button type="button" class="btn primary small" id="btnAddItem">+ Adicionar item</button>'+
       '</div></div>';
@@ -305,6 +368,8 @@
 
     $("btnAddItem").addEventListener("click", function(){ openItemDialog(null); });
     $("btnEditEvent").addEventListener("click", function(){ requireAdmin(function(){ openEventDialog(ev.id); }); });
+    $("btnExportCsv").addEventListener("click", function(){ exportEventCSV(ev); });
+    $("btnImportCsv").addEventListener("click", function(){ requireAdmin(function(){ $("fileImportCsv").click(); }); });
     $("btnDeleteEvent").addEventListener("click", function(){ requireAdmin(function(){ confirmDeleteEvent(ev); }); });
     main.querySelectorAll("[data-edit-item]").forEach(function(btn){
       btn.addEventListener("click", function(){ openItemDialog(btn.getAttribute("data-edit-item")); });
@@ -461,6 +526,127 @@
     });
   }
 
+  // ---------- CSV export / import (built from ITEM_FIELDS, so a column
+  // added/removed there round-trips automatically — no per-column code
+  // needed here either) ----------
+  function csvField(v){
+    var s = v==null ? "" : String(v);
+    if(/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g,'""') + '"';
+    return s;
+  }
+
+  function itemsToCSV(items){
+    var lines = [ITEM_FIELDS.map(function(f){ return csvField(f.label); }).join(",")];
+    items.forEach(function(it){
+      var row = ITEM_FIELDS.map(function(f){
+        var v = it[f.key];
+        if(f.type === "date") return v ? String(v).slice(0,10) : "";
+        return v==null ? "" : v;
+      });
+      lines.push(row.map(csvField).join(","));
+    });
+    return lines.join("\r\n");
+  }
+
+  function slugify(s){
+    return String(s||"").toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g,"")
+      .replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"") || "evento";
+  }
+
+  function downloadText(filename, text){
+    var blob = new Blob(["﻿" + text], {type:"text/csv;charset=utf-8;"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function exportEventCSV(ev){
+    var csv = itemsToCSV(state.items);
+    var today = new Date().toISOString().slice(0,10);
+    downloadText("inventario-" + slugify(ev.name) + "-" + today + ".csv", csv);
+  }
+
+  // Minimal RFC4180-style parser: handles quoted fields, embedded commas/
+  // quotes/newlines, and CRLF or LF line endings — enough for a CSV saved
+  // from Excel, Numbers, or Google Sheets.
+  function parseCSV(text){
+    var rows = [], row = [], field = "", inQuotes = false, i = 0;
+    text = String(text).replace(/^﻿/, "");
+    while(i < text.length){
+      var c = text[i];
+      if(inQuotes){
+        if(c === '"'){
+          if(text[i+1] === '"'){ field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += c; i++; continue;
+      }
+      if(c === '"'){ inQuotes = true; i++; continue; }
+      if(c === ','){ row.push(field); field = ""; i++; continue; }
+      if(c === '\r'){ i++; continue; }
+      if(c === '\n'){ row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+      field += c; i++;
+    }
+    row.push(field);
+    if(row.length > 1 || row[0] !== ""){ rows.push(row); }
+    return rows;
+  }
+
+  function handleImportFile(e){
+    var file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if(!file) return;
+    if(!state.currentEventId){ alertInline("Abra um evento antes de importar."); return; }
+    var eventId = state.currentEventId;
+
+    var reader = new FileReader();
+    reader.onload = function(){
+      var rows = parseCSV(reader.result);
+      if(!rows.length){ alertInline("O ficheiro CSV está vazio."); return; }
+
+      var header = rows[0].map(function(h){ return String(h||"").trim().toLowerCase(); });
+      var colIndex = {};
+      ITEM_FIELDS.forEach(function(f){
+        var idx = header.indexOf(f.label.toLowerCase());
+        if(idx !== -1) colIndex[f.key] = idx;
+      });
+      if(!Object.keys(colIndex).length){
+        alertInline('Não foi possível reconhecer as colunas do CSV. Confirme que a primeira linha tem os nomes das colunas (ex: "'+ITEM_FIELDS[0].label+'").');
+        return;
+      }
+
+      var dataRows = rows.slice(1).filter(function(r){
+        return r.some(function(v){ return String(v||"").trim() !== ""; });
+      });
+      if(!dataRows.length){ alertInline("O ficheiro CSV não tem itens para importar."); return; }
+
+      openConfirm("Importar itens", "Importar " + dataRows.length + " item(ns) deste ficheiro para este evento?", function(){
+        var payload = dataRows.map(function(r){
+          var obj = { event_id: eventId, updated_at: new Date().toISOString() };
+          ITEM_FIELDS.forEach(function(f){
+            var idx = colIndex[f.key];
+            var raw = (idx != null) ? (r[idx] || "") : "";
+            if(f.type === "number" || f.type === "currency") obj[f.column] = Number(String(raw).replace(",",".")) || 0;
+            else if(f.type === "date") obj[f.column] = raw ? String(raw).trim().slice(0,10) : null;
+            else obj[f.column] = String(raw).trim();
+          });
+          return obj;
+        });
+        sb.from("items").insert(payload).then(function(res){
+          if(res.error){ alertInline("Não foi possível importar o CSV (" + res.error.message + ")."); return; }
+          loadItems(eventId);
+        });
+      }, {confirmLabel:"Importar", confirmClass:"primary"});
+    };
+    reader.readAsText(file, "utf-8");
+  }
+  $("fileImportCsv").addEventListener("change", handleImportFile);
+
   // ---------- event dialog ----------
   var editingEventId = null;
   function openEventDialog(eventId){
@@ -513,11 +699,18 @@
   }
 
   // ---------- confirm dialog ----------
+  // Generic confirm/alert dialog. opts.confirmLabel/confirmClass let callers
+  // other than "delete this" (e.g. CSV import) reuse it with non-danger
+  // wording instead of the default "Remover" button.
   var pendingConfirm = null;
-  function openConfirm(title, msg, onYes){
+  function openConfirm(title, msg, onYes, opts){
+    opts = opts || {};
     $("confirmTitle").textContent = title;
     $("confirmMsg").textContent = msg;
     pendingConfirm = onYes;
+    var yesBtn = $("btnConfirmYes");
+    yesBtn.textContent = opts.confirmLabel || "Remover";
+    yesBtn.className = "btn " + (opts.confirmClass || "danger");
     $("dlgConfirm").showModal();
   }
   $("btnConfirmYes").addEventListener("click", function(){
