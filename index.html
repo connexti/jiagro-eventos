@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Inventário de Festas</title>
+<meta name="description" content="Dashboard partilhado para gerir o inventário de doações e compras de cada festa da associação de pais.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <button id="btnBack" class="iconbtn" title="Voltar aos eventos" hidden>←</button>
+    <div class="brand">
+      <span class="brand-mark">🎈</span>
+      <div class="brand-text">
+        <h1 id="pageTitle">Inventário de Festas</h1>
+        <p class="subtitle" id="pageSubtitle">Associação de Pais</p>
+      </div>
+    </div>
+    <button id="btnAdmin" class="iconbtn" title="Administração">🔒</button>
+  </header>
+  <main id="main">
+    <div class="empty"><span class="emoji">⏳</span>A carregar o inventário…</div>
+  </main>
+</div>
+
+<dialog id="dlgItem">
+  <form id="formItem">
+    <div class="dlg-head"><h3 id="dlgItemTitle">Novo item</h3><button type="button" class="iconbtn small" data-close="dlgItem">✕</button></div>
+    <div class="dlg-body">
+      <div class="field">
+        <label for="fOrigem">Origem Doação</label>
+        <input id="fOrigem" required maxlength="120" placeholder="Ex: Padaria Central, Família Silva…">
+      </div>
+      <div class="field">
+        <label for="fProduto">Produto</label>
+        <input id="fProduto" required maxlength="120" placeholder="Ex: Caixas de sumo">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fQuantidade">Quantidade</label>
+          <input id="fQuantidade" type="number" min="0" step="1" required>
+        </div>
+        <div class="field">
+          <label for="fTipo">Tipo</label>
+          <select id="fTipo"></select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fData">Data de entrega</label>
+          <input id="fData" type="date">
+        </div>
+        <div class="field">
+          <label for="fPreco">Preço (€)</label>
+          <input id="fPreco" type="number" min="0" step="0.01" placeholder="0.00">
+        </div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn" data-close="dlgItem">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgEvent">
+  <form id="formEvent">
+    <div class="dlg-head"><h3 id="dlgEventTitle">Novo evento</h3><button type="button" class="iconbtn small" data-close="dlgEvent">✕</button></div>
+    <div class="dlg-body">
+      <div class="field">
+        <label for="fEventName">Nome do evento</label>
+        <input id="fEventName" required maxlength="120" placeholder="Ex: Festa de Natal 2026">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="fEventDate">Data</label>
+          <input id="fEventDate" type="date">
+        </div>
+        <div class="field">
+          <label for="fEventLocal">Local</label>
+          <input id="fEventLocal" maxlength="120" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="field">
+        <label for="fEventNotas">Notas</label>
+        <textarea id="fEventNotas" rows="2" maxlength="300" placeholder="Opcional"></textarea>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn" data-close="dlgEvent">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgAdmin">
+  <div class="dlg-head"><h3>Administração</h3><button type="button" class="iconbtn small" data-close="dlgAdmin">✕</button></div>
+  <div class="dlg-body">
+    <div id="adminPinView">
+      <p class="admin-note">Área reservada aos administradores da associação de pais. Introduza o PIN para gerir eventos e categorias.</p>
+      <form id="formPin">
+        <div class="pin-dots">
+          <input type="password" inputmode="numeric" maxlength="1" class="pindigit">
+          <input type="password" inputmode="numeric" maxlength="1" class="pindigit">
+          <input type="password" inputmode="numeric" maxlength="1" class="pindigit">
+          <input type="password" inputmode="numeric" maxlength="1" class="pindigit">
+        </div>
+        <p id="pinError" style="color:var(--danger); font-size:13px; text-align:center; min-height:18px; margin:0 0 10px;"></p>
+        <button type="submit" class="btn primary" style="width:100%;">Entrar</button>
+      </form>
+    </div>
+    <div id="adminPanelView" hidden>
+      <div class="tabs">
+        <button type="button" class="tab active" data-tab="events">Eventos</button>
+        <button type="button" class="tab" data-tab="tipos">Categorias (Tipo)</button>
+      </div>
+      <div id="tabEvents">
+        <button type="button" id="btnNewEventAdmin" class="btn primary small" style="margin-bottom:14px;">+ Novo evento</button>
+        <div id="adminEventList"></div>
+      </div>
+      <div id="tabTipos" hidden>
+        <p class="admin-note">Estas categorias aparecem no campo "Tipo" ao adicionar um item ao inventário.</p>
+        <div class="chips" id="tipoChips"></div>
+        <form id="formAddTipo" class="row">
+          <input id="fNewTipo" placeholder="Nova categoria…" maxlength="40" style="flex:1; font:inherit; padding:9px 11px; border-radius:9px; border:1px solid var(--border); background:var(--bg); color:var(--fg);">
+          <button type="submit" class="btn small">Adicionar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="dlg-foot">
+    <button type="button" id="btnLockAdmin" class="btn ghost" hidden>🔒 Trancar sessão de administrador</button>
+  </div>
+</dialog>
+
+<dialog id="dlgConfirm">
+  <div class="dlg-head"><h3 id="confirmTitle">Confirmar</h3></div>
+  <div class="dlg-body"><p id="confirmMsg" style="margin:0; color:var(--muted);"></p></div>
+  <div class="dlg-foot">
+    <button type="button" class="btn" data-close="dlgConfirm">Cancelar</button>
+    <button type="button" id="btnConfirmYes" class="btn danger">Remover</button>
+  </div>
+</dialog>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+</body>
+</html>
