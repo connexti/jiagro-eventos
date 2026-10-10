@@ -32,34 +32,9 @@
   <form id="formItem">
     <div class="dlg-head"><h3 id="dlgItemTitle">Novo item</h3><button type="button" class="iconbtn small" data-close="dlgItem">✕</button></div>
     <div class="dlg-body">
-      <div class="field">
-        <label for="fOrigem">Origem Doação</label>
-        <input id="fOrigem" required maxlength="120" placeholder="Ex: Padaria Central, Família Silva…">
-      </div>
-      <div class="field">
-        <label for="fProduto">Produto</label>
-        <input id="fProduto" required maxlength="120" placeholder="Ex: Caixas de sumo">
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="fQuantidade">Quantidade</label>
-          <input id="fQuantidade" type="number" min="0" step="1" required>
-        </div>
-        <div class="field">
-          <label for="fTipo">Tipo</label>
-          <select id="fTipo"></select>
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="fData">Data de entrega</label>
-          <input id="fData" type="date">
-        </div>
-        <div class="field">
-          <label for="fPreco">Preço (€)</label>
-          <input id="fPreco" type="number" min="0" step="0.01" placeholder="0.00">
-        </div>
-      </div>
+      <!-- Populated from the ITEM_FIELDS config at the top of app.js —
+           add, remove, or edit a column there, not here. -->
+      <div id="itemFormFields"></div>
     </div>
     <div class="dlg-foot">
       <button type="button" class="btn" data-close="dlgItem">Cancelar</button>

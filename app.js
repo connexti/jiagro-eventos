@@ -15,6 +15,49 @@
   var ADMIN_PIN = "2026";
   // ============================================================
 
+  // ============================================================
+  // INVENTORY COLUMNS — the single source of truth for the item form
+  // and the inventory table. To add, remove, or edit a column, change
+  // this array only; the form fields, table headers/cells, and the
+  // object sent to Supabase are all generated from it.
+  //
+  // IMPORTANT: this does NOT change the database. Adding a column here
+  // means you also need, once, in the Supabase SQL editor:
+  //   alter table public.items add column <db_column> <type>;
+  // and removing one means (optionally, to actually drop the data):
+  //   alter table public.items drop column <db_column>;
+  // Keep supabase_schema.sql in sync so a fresh setup matches.
+  //
+  // Field shape:
+  //   key        camelCase name used in JS (state, mapItem, etc.)
+  //   column     snake_case column name in the "items" table
+  //   label      shown above the input in the add/edit form
+  //   tableHeader  column header text in the inventory table (defaults to label)
+  //   type       "text" | "number" | "currency" | "date" | "select"
+  //   width      "full" or "half" — half-width fields pair up two per row
+  //   required   whether the form field is required
+  //   placeholder  optional input placeholder
+  //   min / step   for "number" and "currency" inputs
+  //   options()  for "select" only — function returning the current list of choices
+  //   chip       for "select" only — render the table cell as a pill badge
+  //   showInTable  set to false to keep a field in the form but hide it from the table
+  // ============================================================
+  var ITEM_FIELDS = [
+    { key:"origem", column:"origem", label:"Origem Doação", type:"text", width:"full", required:true,
+      placeholder:"Ex: Padaria Central, Família Silva…" },
+    { key:"produto", column:"produto", label:"Produto", type:"text", width:"full", required:true,
+      placeholder:"Ex: Caixas de sumo" },
+    { key:"quantidade", column:"quantidade", label:"Quantidade", tableHeader:"Qtd.", type:"number",
+      width:"half", required:true, min:0, step:1 },
+    { key:"tipo", column:"tipo", label:"Tipo", type:"select", width:"half", chip:true,
+      options:function(){ return state.settings.tipoOptions; } },
+    { key:"dataEntrega", column:"data_entrega", label:"Data de entrega", tableHeader:"Entrega",
+      type:"date", width:"half" },
+    { key:"preco", column:"preco", label:"Preço (€)", tableHeader:"Preço", type:"currency",
+      width:"half", min:0, step:0.01, placeholder:"0.00" }
+  ];
+  // ============================================================
+
   var $ = function(id){ return document.getElementById(id); };
 
   var CONFIGURED = SUPABASE_URL.indexOf("YOUR-PROJECT") === -1 && SUPABASE_ANON_KEY.indexOf("YOUR-ANON-PUBLIC-KEY") === -1;
@@ -88,12 +131,13 @@
   function mapEvent(row){
     return { id: row.id, name: row.name, date: row.date, location: row.location || "", notes: row.notes || "", createdAt: row.created_at };
   }
+
+  // Builds the view-model object from a DB row using ITEM_FIELDS, so every
+  // configured column round-trips automatically — no per-column code needed.
   function mapItem(row){
-    return {
-      id: row.id, eventId: row.event_id, origem: row.origem, produto: row.produto,
-      quantidade: row.quantidade, tipo: row.tipo, dataEntrega: row.data_entrega,
-      preco: row.preco, createdAt: row.created_at
-    };
+    var out = { id: row.id, eventId: row.event_id, createdAt: row.created_at };
+    ITEM_FIELDS.forEach(function(f){ out[f.key] = row[f.column]; });
+    return out;
   }
 
   function watchItems(eventId){
@@ -198,8 +242,13 @@
     });
   }
 
+  // The home-screen badge always shows item count + total "preco" value —
+  // that's a product choice (preco is the one column treated as "the
+  // money"), not something every configured column should feed into, so
+  // it's intentionally hardcoded to that column rather than driven by
+  // ITEM_FIELDS.
   function fillEventCount(eventId){
-    sb.from("items").select("quantidade,preco", {count:"exact"}).eq("event_id", eventId).then(function(res){
+    sb.from("items").select("preco", {count:"exact"}).eq("event_id", eventId).then(function(res){
       if(res.error) return;
       var n = res.count != null ? res.count : res.data.length;
       var total = 0;
@@ -223,6 +272,11 @@
     $("pageTitle").textContent = ev.name || "Evento";
     $("pageSubtitle").textContent = (ev.date ? fmtDate(ev.date) : "Sem data") + (ev.location ? " · "+ev.location : "");
 
+    // Same product-level choice as fillEventCount: these three stat tiles
+    // are specifically about "preco" (money) and "origem" (who donated),
+    // not generic per-column aggregates — they keep working regardless of
+    // how many other columns ITEM_FIELDS has, but they do assume those two
+    // particular columns exist.
     var totalValor = state.items.reduce(function(s,i){ return s + (Number(i.preco)||0); }, 0);
     var doadores = new Set(state.items.map(function(i){ return (i.origem||"").trim().toLowerCase(); }).filter(Boolean)).size;
 
@@ -244,24 +298,7 @@
         '<p style="margin:0 0 6px; font-weight:600; color:var(--fg);">Ainda sem itens registados</p>'+
         '<p style="margin:0;">Use "+ Adicionar item" para registar a primeira doação ou compra para este evento.</p></div>';
     }else{
-      html += '<div class="table-wrap"><table><thead><tr>'+
-        '<th>Origem Doação</th><th>Produto</th><th>Qtd.</th><th>Tipo</th><th>Entrega</th><th>Preço</th><th></th>'+
-        '</tr></thead><tbody>';
-      state.items.forEach(function(it){
-        html += '<tr>'+
-          '<td>'+esc(it.origem)+'</td>'+
-          '<td>'+esc(it.produto)+'</td>'+
-          '<td class="num">'+esc(it.quantidade)+'</td>'+
-          '<td><span class="tipo-chip">'+esc(it.tipo||"—")+'</span></td>'+
-          '<td>'+fmtDate(it.dataEntrega)+'</td>'+
-          '<td class="num">'+fmtMoney(it.preco)+'</td>'+
-          '<td class="actions">'+
-            '<button type="button" class="btn small" data-edit-item="'+esc(it.id)+'">Editar</button> '+
-            '<button type="button" class="btn danger small" data-del-item="'+esc(it.id)+'">Remover</button>'+
-          '</td>'+
-        '</tr>';
-      });
-      html += '</tbody></table></div>';
+      html += renderItemsTable();
     }
 
     main.innerHTML = html;
@@ -277,44 +314,127 @@
     });
   }
 
-  // ---------- item dialog ----------
+  // Table header + rows, generated entirely from ITEM_FIELDS.
+  function renderItemsTable(){
+    var visible = ITEM_FIELDS.filter(function(f){ return f.showInTable !== false; });
+    var minWidth = Math.max(560, visible.length * 120 + 160);
+
+    var html = '<div class="table-wrap"><table style="min-width:'+minWidth+'px"><thead><tr>';
+    visible.forEach(function(f){ html += '<th>'+esc(f.tableHeader || f.label)+'</th>'; });
+    html += '<th></th></tr></thead><tbody>';
+
+    state.items.forEach(function(it){
+      html += '<tr>';
+      visible.forEach(function(f){
+        var cls = (f.type === "number" || f.type === "currency") ? ' class="num"' : "";
+        html += '<td'+cls+'>'+renderItemCell(f, it[f.key])+'</td>';
+      });
+      html += '<td class="actions">'+
+        '<button type="button" class="btn small" data-edit-item="'+esc(it.id)+'">Editar</button> '+
+        '<button type="button" class="btn danger small" data-del-item="'+esc(it.id)+'">Remover</button>'+
+      '</td></tr>';
+    });
+
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  function renderItemCell(f, value){
+    if(f.type === "currency") return fmtMoney(value);
+    if(f.type === "date") return fmtDate(value);
+    if(f.type === "select" && f.chip) return '<span class="tipo-chip">'+esc(value||"—")+'</span>';
+    return esc(value);
+  }
+
+  // ---------- item form (built from ITEM_FIELDS) ----------
+  function fieldInputHtml(f){
+    var id = "f_" + f.key;
+    if(f.type === "select"){
+      return '<select id="'+id+'"></select>';
+    }
+    if(f.type === "date"){
+      return '<input id="'+id+'" type="date"'+(f.required?" required":"")+'>';
+    }
+    if(f.type === "number" || f.type === "currency"){
+      var min = f.min != null ? f.min : 0;
+      var step = f.step != null ? f.step : 1;
+      var ph = f.placeholder ? ' placeholder="'+esc(f.placeholder)+'"' : "";
+      return '<input id="'+id+'" type="number" min="'+min+'" step="'+step+'"'+(f.required?" required":"")+ph+'>';
+    }
+    var ph2 = f.placeholder ? ' placeholder="'+esc(f.placeholder)+'"' : "";
+    return '<input id="'+id+'" type="text" maxlength="120"'+(f.required?" required":"")+ph2+'>';
+  }
+
+  function renderItemFormFields(){
+    var html = "";
+    var halfBuffer = [];
+    function flushHalves(){
+      for(var i=0; i<halfBuffer.length; i+=2){
+        if(halfBuffer[i+1]){
+          html += '<div class="field-row">'+fieldWrapHtml(halfBuffer[i])+fieldWrapHtml(halfBuffer[i+1])+'</div>';
+        }else{
+          html += fieldWrapHtml(halfBuffer[i]);
+        }
+      }
+      halfBuffer = [];
+    }
+    function fieldWrapHtml(f){
+      return '<div class="field"><label for="f_'+f.key+'">'+esc(f.label)+'</label>'+fieldInputHtml(f)+'</div>';
+    }
+    ITEM_FIELDS.forEach(function(f){
+      if(f.width === "half"){ halfBuffer.push(f); }
+      else{ flushHalves(); html += fieldWrapHtml(f); }
+    });
+    flushHalves();
+    return html;
+  }
+
+  function getFieldValue(f, el){
+    if(f.type === "number" || f.type === "currency") return Number(el.value) || 0;
+    if(f.type === "date") return el.value || null;
+    if(f.type === "text") return el.value.trim();
+    return el.value;
+  }
+
+  function setFieldValue(f, el, value){
+    if(f.type === "date"){ el.value = value ? String(value).slice(0,10) : ""; return; }
+    if(f.type === "select"){ el.value = (value != null && value !== "") ? value : ((f.options()[0]) || ""); return; }
+    el.value = (value != null) ? value : "";
+  }
+
+  function populateSelectField(f, el, currentValue){
+    var opts = f.options ? f.options() : [];
+    el.innerHTML = opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o)+'</option>'; }).join("");
+    if(currentValue && opts.indexOf(currentValue) === -1){
+      el.insertAdjacentHTML("afterbegin", '<option value="'+esc(currentValue)+'">'+esc(currentValue)+'</option>');
+    }
+  }
+
   var editingItemId = null;
   function openItemDialog(itemId){
     editingItemId = itemId;
-    var sel = $("fTipo");
-    sel.innerHTML = state.settings.tipoOptions.map(function(t){ return '<option value="'+esc(t)+'">'+esc(t)+'</option>'; }).join("");
-    if(itemId){
-      var it = state.items.find(function(i){ return i.id === itemId; });
-      $("dlgItemTitle").textContent = "Editar item";
-      $("fOrigem").value = it.origem || "";
-      $("fProduto").value = it.produto || "";
-      $("fQuantidade").value = it.quantidade != null ? it.quantidade : "";
-      if(it.tipo && state.settings.tipoOptions.indexOf(it.tipo) === -1){
-        sel.insertAdjacentHTML("afterbegin", '<option value="'+esc(it.tipo)+'">'+esc(it.tipo)+'</option>');
-      }
-      sel.value = it.tipo || state.settings.tipoOptions[0];
-      $("fData").value = it.dataEntrega ? String(it.dataEntrega).slice(0,10) : "";
-      $("fPreco").value = it.preco != null ? it.preco : "";
-    }else{
-      $("dlgItemTitle").textContent = "Novo item";
-      $("formItem").reset();
-      sel.value = state.settings.tipoOptions[0];
-    }
+    $("itemFormFields").innerHTML = renderItemFormFields();
+
+    var it = itemId ? state.items.find(function(i){ return i.id === itemId; }) : null;
+    $("dlgItemTitle").textContent = itemId ? "Editar item" : "Novo item";
+
+    ITEM_FIELDS.forEach(function(f){
+      var el = $("f_"+f.key);
+      var val = it ? it[f.key] : undefined;
+      if(f.type === "select"){ populateSelectField(f, el, val); }
+      setFieldValue(f, el, val);
+    });
+
     $("dlgItem").showModal();
   }
+
   $("formItem").addEventListener("submit", function(e){
     e.preventDefault();
     if(!state.currentEventId) return;
-    var data = {
-      event_id: state.currentEventId,
-      origem: $("fOrigem").value.trim(),
-      produto: $("fProduto").value.trim(),
-      quantidade: Number($("fQuantidade").value) || 0,
-      tipo: $("fTipo").value,
-      data_entrega: $("fData").value || null,
-      preco: Number($("fPreco").value) || 0,
-      updated_at: new Date().toISOString()
-    };
+    var data = { event_id: state.currentEventId, updated_at: new Date().toISOString() };
+    ITEM_FIELDS.forEach(function(f){
+      data[f.column] = getFieldValue(f, $("f_"+f.key));
+    });
     var submitBtn = e.target.querySelector('button[type=submit]');
     submitBtn.disabled = true;
     var p;
