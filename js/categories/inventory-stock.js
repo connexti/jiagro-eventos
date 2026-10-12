@@ -449,6 +449,6 @@ export default {
   onClose: onClose,
   render: renderCategory,
   adminTabs: [
-    { key:"stock-tipos", label:"Categorias (Tipo)", render: renderAdminTiposTab }
+    { key:"stock-tipos", label:"Stock (Tipo)", render: renderAdminTiposTab }
   ]
 };

@@ -687,6 +687,6 @@ export default {
   handleBack: handleBack,
   adminTabs: [
     { key:"events", label:"Eventos", render: renderAdminEventsTab },
-    { key:"tipos", label:"Categorias (Tipo)", render: renderAdminTiposTab }
+    { key:"tipos", label:"Festas (Tipo)", render: renderAdminTiposTab }
   ]
 };
