@@ -32,8 +32,9 @@
   <form id="formItem">
     <div class="dlg-head"><h3 id="dlgItemTitle">Novo item</h3><button type="button" class="iconbtn small" data-close="dlgItem">✕</button></div>
     <div class="dlg-body">
-      <!-- Populated from the ITEM_FIELDS config at the top of app.js —
-           add, remove, or edit a column there, not here. -->
+      <!-- Populated from the ITEM_FIELDS config at the top of
+           js/categories/party-inventory.js — add, remove, or edit a
+           column there, not here. -->
       <div id="itemFormFields"></div>
     </div>
     <div class="dlg-foot">
@@ -73,6 +74,22 @@
   </form>
 </dialog>
 
+<dialog id="dlgStockItem">
+  <form id="formStockItem">
+    <div class="dlg-head"><h3 id="dlgStockItemTitle">Novo artigo</h3><button type="button" class="iconbtn small" data-close="dlgStockItem">✕</button></div>
+    <div class="dlg-body">
+      <!-- Populated from the ITEM_FIELDS config at the top of
+           js/categories/inventory-stock.js — add, remove, or edit a
+           column there, not here. -->
+      <div id="stockItemFormFields"></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn" data-close="dlgStockItem">Cancelar</button>
+      <button type="submit" class="btn primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="dlgAdmin">
   <div class="dlg-head"><h3>Administração</h3><button type="button" class="iconbtn small" data-close="dlgAdmin">✕</button></div>
   <div class="dlg-body">
@@ -90,22 +107,11 @@
       </form>
     </div>
     <div id="adminPanelView" hidden>
-      <div class="tabs">
-        <button type="button" class="tab active" data-tab="events">Eventos</button>
-        <button type="button" class="tab" data-tab="tipos">Categorias (Tipo)</button>
-      </div>
-      <div id="tabEvents">
-        <button type="button" id="btnNewEventAdmin" class="btn primary small" style="margin-bottom:14px;">+ Novo evento</button>
-        <div id="adminEventList"></div>
-      </div>
-      <div id="tabTipos" hidden>
-        <p class="admin-note">Estas categorias aparecem no campo "Tipo" ao adicionar um item ao inventário.</p>
-        <div class="chips" id="tipoChips"></div>
-        <form id="formAddTipo" class="row">
-          <input id="fNewTipo" placeholder="Nova categoria…" maxlength="40" style="flex:1; font:inherit; padding:9px 11px; border-radius:9px; border:1px solid var(--border); background:var(--bg); color:var(--fg);">
-          <button type="submit" class="btn small">Adicionar</button>
-        </form>
-      </div>
+      <!-- Populated dynamically by js/core.js's renderAdminPanel() from
+           the adminTabs each registered category module contributes —
+           see js/categories/*.js, not this markup. -->
+      <div class="tabs" id="adminTabsNav"></div>
+      <div id="adminTabContent"></div>
     </div>
   </div>
   <div class="dlg-foot">
@@ -123,8 +129,9 @@
 </dialog>
 
 <input type="file" id="fileImportCsv" accept=".csv,text/csv" hidden>
+<input type="file" id="fileImportStockCsv" accept=".csv,text/csv" hidden>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<script src="app.js"></script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>
