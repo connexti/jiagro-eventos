@@ -47,7 +47,9 @@ var ITEM_FIELDS = [
   { key:"dataEntrega", column:"data_entrega", label:"Data de entrega", tableHeader:"Entrega",
     type:"date", width:"half" },
   { key:"preco", column:"preco", label:"Preço (€)", tableHeader:"Preço", type:"currency",
-    width:"half", min:0, step:0.01, placeholder:"0.00" }
+    width:"half", min:0, step:0.01, placeholder:"0.00" },
+  { key:"notas", column:"notas", label:"Notas", type:"textarea", width:"full",
+    placeholder:"Detalhes adicionais (opcional)" }    
 ];
 
 var meta = { key:"inventory", label:"Inventário de Festas", description:"Doações e compras para cada festa do ano.", icon:"🎈" };
